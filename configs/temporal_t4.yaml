@@ -1,0 +1,35 @@
+# temporal_t4.yaml — Temporal InterFuser, T=4 frames
+# Run via: sbatch scripts/train_temporal.sh
+
+model:
+  name: interfuser_temporal
+  temporal_frames: 4          # Number of frames in the temporal window
+  frame_stride: 1             # Take every Nth frame from the sequence
+  fusion_strategy: concat     # How to merge temporal features: concat | temporal_attn
+  img_size: 224
+  pretrained_backbone: null   # Set via CLI or hardcode path here
+
+data:
+  train_towns: [1, 2, 3, 4, 6, 7, 10]
+  val_towns: [5]
+  num_routes_train: null      # null = use all
+  num_routes_val: null
+  augmentation: true
+  sequence_overlap: 2         # Consecutive windows share this many frames
+
+training:
+  batch_size: 8
+  num_workers: 8
+  epochs: 30
+  optimizer: adamw
+  lr: 1.0e-4
+  weight_decay: 0.05
+  lr_scheduler: cosine
+  warmup_epochs: 3
+  gradient_clip: 1.0
+  mixed_precision: true       # fp16 training
+
+logging:
+  log_interval: 100
+  save_interval: 5            # Save checkpoint every N epochs
+  output_dir: output/temporal_t4

@@ -1,0 +1,6 @@
+# Temporal extension requirements
+# Core deps are already in the interfuser conda env (PyTorch 2.1.0+cu121, CUDA 12.1)
+# This file captures any *additional* packages needed for the temporal extension.
+
+pyyaml>=6.0
+einops>=0.7.0          # Useful for tensor reshaping in attention modules
