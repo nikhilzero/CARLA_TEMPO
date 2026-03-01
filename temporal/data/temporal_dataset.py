@@ -155,6 +155,8 @@ def collate_temporal(batch: List[Tuple]) -> Tuple:
         if isinstance(targets_batch[0][i], torch.Tensor)
         else torch.stack([torch.from_numpy(targets_batch[b][i]) for b in range(B)])
         if isinstance(targets_batch[0][i], np.ndarray)
+        else torch.tensor([targets_batch[b][i] for b in range(B)])
+        if isinstance(targets_batch[0][i], (int, float, bool))
         else [targets_batch[b][i] for b in range(B)]
         for i in range(n_targets)
     )
