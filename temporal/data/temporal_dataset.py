@@ -16,6 +16,7 @@ TemporalWindowDataset returns (frames, target) where:
 collate_temporal handles batching for the DataLoader.
 """
 
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 from typing import List, Tuple, Any
@@ -139,8 +140,12 @@ def collate_temporal(batch: List[Tuple]) -> Tuple:
             vals = [item[key] for item in frame_t_items]
             if isinstance(vals[0], torch.Tensor):
                 collated_frame[key] = torch.stack(vals)
+            elif isinstance(vals[0], np.ndarray):
+                collated_frame[key] = torch.stack([torch.from_numpy(v) for v in vals])
+            elif isinstance(vals[0], (int, float, bool)):
+                collated_frame[key] = torch.tensor(vals)
             else:
-                collated_frame[key] = vals  # non-tensor fields stay as list
+                collated_frame[key] = vals  # metadata: keep as list
         inputs.append(collated_frame)
 
     # Collate the target tuple element-wise across the batch
@@ -148,6 +153,8 @@ def collate_temporal(batch: List[Tuple]) -> Tuple:
     target = tuple(
         torch.stack([targets_batch[b][i] for b in range(B)])
         if isinstance(targets_batch[0][i], torch.Tensor)
+        else torch.stack([torch.from_numpy(targets_batch[b][i]) for b in range(B)])
+        if isinstance(targets_batch[0][i], np.ndarray)
         else [targets_batch[b][i] for b in range(B)]
         for i in range(n_targets)
     )
