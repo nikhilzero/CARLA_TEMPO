@@ -1,30 +1,65 @@
 """
-temporal_dataset.py — Dataset wrapper that yields temporal windows of frames.
+temporal_dataset.py — Temporal window wrapper around CarlaMVDetDataset.
 
-Wraps any single-frame CARLA/LMDrive dataset and groups consecutive frames
-into windows of size T for temporal training.
+Wraps the baseline CarlaMVDetDataset and groups consecutive frames into
+windows of size T without crossing route boundaries.
+
+CarlaMVDetDataset.__getitem__ returns (data_dict, target_tuple):
+  data_dict:    {"rgb", "rgb_left", "rgb_right", "rgb_center", "lidar",
+                  "measurements", "command", "target_point", ...}
+  target_tuple: 7-element tuple of tensors used by the baseline loss functions
+
+TemporalWindowDataset returns (frames, target) where:
+  frames: list of T data_dicts (oldest → most recent)
+  target: target_tuple from the LAST (most recent) frame
+
+collate_temporal handles batching for the DataLoader.
 """
 
 import torch
 from torch.utils.data import Dataset
-from typing import List, Dict, Any
+from typing import List, Tuple, Any
+
+
+def episode_lengths_from_carla_dataset(ds) -> List[int]:
+    """
+    Derive per-episode frame counts from CarlaMVDetDataset.route_frames.
+
+    route_frames is a flat list of (route_dir, frame_id) pairs where
+    all frames for one route are stored consecutively.
+
+    Returns a list of frame counts, one per route.
+    """
+    if not hasattr(ds, "route_frames") or not ds.route_frames:
+        return [len(ds)]
+
+    lengths = []
+    current_route = ds.route_frames[0][0]
+    count = 0
+    for route_dir, _ in ds.route_frames:
+        if route_dir == current_route:
+            count += 1
+        else:
+            lengths.append(count)
+            current_route = route_dir
+            count = 1
+    lengths.append(count)
+    return lengths
 
 
 class TemporalWindowDataset(Dataset):
     """
-    Wraps a single-frame dataset and returns windows of T consecutive frames.
+    Wraps CarlaMVDetDataset and returns temporal windows of T consecutive frames.
 
-    The underlying dataset must:
-      - Support integer indexing (dataset[i])
-      - Return a dict with at least: 'front', 'left', 'right', 'rear', 'waypoints'
-      - Items from the same route/episode must be stored consecutively.
+    Windows are built so they never cross route (episode) boundaries.
 
     Args:
-        base_dataset: Single-frame dataset (e.g., LMDrive dataset).
-        num_frames (int): Temporal window size T.
-        frame_stride (int): Step between sampled frames (1 = every frame).
-        episode_lengths (List[int]): Number of frames per episode.
-            If None, assumes all frames form a single episode.
+        base_dataset:     CarlaMVDetDataset instance (with transforms already set).
+        num_frames:       Temporal window size T.
+        frame_stride:     Step between sampled frames within a window.
+        episode_lengths:  Frame counts per episode. If None, inferred from
+                          base_dataset.route_frames (if available), else single
+                          episode assumed.
     """
 
     def __init__(
@@ -38,17 +73,17 @@ class TemporalWindowDataset(Dataset):
         self.num_frames = num_frames
         self.frame_stride = frame_stride
 
-        total = len(base_dataset)
         if episode_lengths is None:
-            episode_lengths = [total]
+            episode_lengths = episode_lengths_from_carla_dataset(base_dataset)
 
-        # Build list of valid window start indices
-        # A window [i, i+stride, ..., i+(T-1)*stride] is valid if all indices
-        # fall within the same episode.
+        # Build list of valid window start indices.
+        # Window [start, start+stride, ..., start+(T-1)*stride] is valid when
+        # all indices fall within the same episode.
         self.windows: List[List[int]] = []
         episode_start = 0
         for ep_len in episode_lengths:
             ep_end = episode_start + ep_len
+            # Last valid start ensures all T frames stay within this episode
             window_end = ep_end - (num_frames - 1) * frame_stride
             for start in range(episode_start, window_end):
                 indices = [start + t * frame_stride for t in range(num_frames)]
@@ -58,60 +93,63 @@ class TemporalWindowDataset(Dataset):
     def __len__(self) -> int:
         return len(self.windows)
 
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: int) -> Tuple[List[Any], Any]:
+        """
+        Returns:
+            frames: list of T data_dicts (oldest → most recent)
+            target: target_tuple from the last frame (for loss computation)
+        """
         indices = self.windows[idx]
 
         frames = []
+        last_target = None
         for i in indices:
-            item = self.base_dataset[i]
-            frames.append({
-                "front": item["front"],
-                "left":  item["left"],
-                "right": item["right"],
-                "rear":  item["rear"],
-            })
+            data, target = self.base_dataset[i]
+            frames.append(data)
+            last_target = target  # overwritten each iter; final value = last frame
 
-        # Labels come from the LAST (most current) frame
-        last_item = self.base_dataset[indices[-1]]
-        return {
-            "frames": frames,                          # list of T dicts
-            "waypoints": last_item["waypoints"],       # supervision target
-            "command": last_item.get("command", None),
-            "measurements": last_item.get("measurements", None),
-        }
+        return frames, last_target
 
 
-def collate_temporal(batch: List[Dict]) -> Dict[str, Any]:
+def collate_temporal(batch: List[Tuple]) -> Tuple:
     """
-    Custom collate for temporal windows.
+    Collate a batch of (frames_list, target_tuple) items.
+
+    Args:
+        batch: list of B items, each item is (frames_list, target_tuple)
+               frames_list: list of T data_dicts
+               target_tuple: 7-element tuple of tensors (from CarlaMVDetDataset)
+
     Returns:
-        frames: list of T dicts, each with stacked tensors (B, C, H, W)
-        waypoints: (B, N_wp, 2)
-        command: (B,) or None
-        measurements: (B, M) or None
+        inputs: list of T dicts, each dict maps key → (B, ...) tensor
+        target: tuple of (B, ...) tensors, identical structure to baseline target
     """
-    T = len(batch[0]["frames"])
-    frames = []
+    frames_batch = [item[0] for item in batch]   # B × [T × dict]
+    targets_batch = [item[1] for item in batch]  # B × tuple
+
+    T = len(frames_batch[0])
+    B = len(batch)
+
+    # Collate T frames across the batch dimension
+    inputs = []
     for t in range(T):
-        frame_t = {
-            key: torch.stack([b["frames"][t][key] for b in batch])
-            for key in batch[0]["frames"][0].keys()
-        }
-        frames.append(frame_t)
+        frame_t_items = [frames_batch[b][t] for b in range(B)]
+        collated_frame = {}
+        for key in frame_t_items[0]:
+            vals = [item[key] for item in frame_t_items]
+            if isinstance(vals[0], torch.Tensor):
+                collated_frame[key] = torch.stack(vals)
+            else:
+                collated_frame[key] = vals  # non-tensor fields stay as list
+        inputs.append(collated_frame)
 
-    waypoints = torch.stack([b["waypoints"] for b in batch])
+    # Collate the target tuple element-wise across the batch
+    n_targets = len(targets_batch[0])
+    target = tuple(
+        torch.stack([targets_batch[b][i] for b in range(B)])
+        if isinstance(targets_batch[0][i], torch.Tensor)
+        else [targets_batch[b][i] for b in range(B)]
+        for i in range(n_targets)
+    )
 
-    command = None
-    if batch[0]["command"] is not None:
-        command = torch.stack([b["command"] for b in batch])
-
-    measurements = None
-    if batch[0]["measurements"] is not None:
-        measurements = torch.stack([b["measurements"] for b in batch])
-
-    return {
-        "frames": frames,
-        "waypoints": waypoints,
-        "command": command,
-        "measurements": measurements,
-    }
+    return inputs, target
