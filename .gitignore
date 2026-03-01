@@ -1,0 +1,48 @@
+# Training outputs (large, Amarel-only)
+runs/
+checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# PyTorch checkpoints
+*.pth
+*.pth.tar
+*.ckpt
+
+# Logs (SLURM outputs live on Amarel)
+logs/
+*.out
+*.err
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data (never commit large datasets)
+*.npy
+*.jpg
+*.png
+*.json.gz
+
+# TensorBoard
+events.out.tfevents.*
