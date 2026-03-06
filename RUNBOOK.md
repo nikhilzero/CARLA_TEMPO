@@ -14,6 +14,11 @@ Master's thesis — Rutgers Camden. Temporal extension of InterFuser for autonom
 | Submit baseline full | `sbatch scripts/slurm/baseline_train.sbatch` |
 | Submit temporal smoke | `sbatch scripts/slurm/temporal_smoke.sbatch` |
 | Submit temporal full | `sbatch scripts/slurm/temporal_train.sbatch` |
+| Submit temporal 24-epoch | `sbatch scripts/slurm/temporal_train_24ep.sbatch` |
+| Ablation T=2 | `sbatch scripts/slurm/ablation_T2.sbatch` |
+| Ablation T=8 | `sbatch scripts/slurm/ablation_T8.sbatch` |
+| Run eval (unified) | `sbatch scripts/slurm/eval_temporal.sbatch` |
+| Run eval custom ckpt | `CKPT=/path/to/model_best.pth.tar sbatch scripts/slurm/eval_temporal.sbatch` |
 | Check queue | `squeue -u nd967` |
 | Tail log | `tail -f /scratch/nd967/CARLA_TEMPO/logs/<logfile>.out` |
 
