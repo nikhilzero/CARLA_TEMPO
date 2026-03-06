@@ -68,16 +68,14 @@ Status legend: ✅ Done | 🔄 In Progress | ⬜ Not Started | ⚠️ Blocked
 
 ## PHASE 3 — Evaluation & Comparison (HIGH PRIORITY)
 
-- [ ] ⬜ **Write unified eval script** `temporal/eval.py` that:
-  - Loads either baseline or temporal checkpoint
-  - Runs on val set
-  - Reports waypoint L1, waypoint L2, and composite loss
-  - Outputs comparison-ready metrics
-- [ ] ⬜ Run unified eval on baseline `model_best.pth.tar`
-- [ ] ⬜ Run unified eval on temporal `model_best.pth.tar`
+- [x] ✅ **Write unified eval script** `temporal/eval.py` — waypoint L1/L2 + all head losses
+- [x] ✅ **Write baseline eval script** `temporal/eval_baseline.py` — same metrics, T=1
+- [x] ✅ Run unified eval on baseline `model_best.pth.tar` (EXP-015: waypoint_l1=0.6076m)
+- [x] ✅ Run unified eval on temporal `model_best.pth.tar` (EXP-014: waypoint_l1=0.2811m)
 - [ ] ⬜ Plot loss curves (baseline vs temporal) side-by-side
 - [ ] ⬜ Add `eval_l1_error` computation to `temporal/train.py` validation loop
 - [ ] ⬜ Re-run temporal training with `eval_l1_error` logged to CSV (apples-to-apples)
+  ⚠️ Do this on research-scale data, not debug subset
 
 ---
 
@@ -119,14 +117,36 @@ Status legend: ✅ Done | 🔄 In Progress | ⬜ Not Started | ⚠️ Blocked
 
 ---
 
-## PHASE 6 — Multi-Town & Generalization
+## PHASE 6 — Research-Scale Dataset & Multi-Town Training
 
-- [ ] ⬜ Confirm Amarel dataset has multi-town data (check dataset_index.txt)
-  - UNKNOWN: does `/scratch/nd967/CARLA_TEMPO/InterFuser/dataset/` have towns 2,3,4,...?
-  - Verification: `cat /scratch/nd967/CARLA_TEMPO/InterFuser/dataset/dataset_index.txt`
-- [ ] ⬜ Train temporal model on all available towns (if data exists)
-- [ ] ⬜ Evaluate on held-out town (Town05 as val)
-- [ ] ⬜ Document generalization gap
+**Context**: All results to date (EXP-000–015) used 210 frames, Town01/Weather18 only.
+These are debug results and MUST NOT be reported as thesis findings.
+The items below are required before any thesis-quality number can be claimed.
+
+### 6a. Dataset Download
+- [ ] ⬜ SSH to Amarel and check scratch quota: `df -h /scratch/nd967`
+- [ ] ⬜ Confirm at least 100–200 GB free before starting download
+- [ ] ⬜ Push `scripts/download_lmdrive.py` + `scripts/download_lmdrive.sbatch` to Amarel
+- [ ] ⬜ Submit download job: `sbatch scripts/download_lmdrive.sbatch`
+  - Towns: 01, 02, 03, 04 (train) + 05 (held-out test)
+  - Weathers: [1, 3, 6, 8, 14, 18]
+  - Route size: `tiny` (start here; upgrade to `short` if quota allows)
+- [ ] ⬜ Verify `dataset_index.txt` after download
+- [ ] ⬜ Record: total frames / towns / weather distribution in EXPERIMENT_LOG.md
+
+### 6b. Temporal Stride Policy Decision
+- [x] ✅ Decide and document stride policy (DEC-005 + DEC-013 in DECISIONS.md):
+  - stride=1 → debug/ablation; stride=5 → all thesis-main runs (2.0 sec context at 10 Hz)
+
+### 6c. Thesis-Scale Training (research-scale data)
+- [x] ✅ Write `scripts/slurm/baseline_train_research.sbatch` (Town01-04, 6 weathers, 24 epochs)
+- [x] ✅ Write `scripts/slurm/temporal_train_research.sbatch` (T=4, stride=5, Town01-04, 24 epochs)
+- [ ] ⬜ Re-run baseline on research-scale subset (`baseline_train_research.sbatch`)
+  → update BASELINE_CKPT in temporal_train_research.sbatch after this completes
+- [ ] ⬜ Re-run temporal T=4 on research-scale subset (`temporal_train_research.sbatch`)
+- [ ] ⬜ Mark all prior 210-frame results as **DEBUG ONLY** in EXPERIMENT_LOG.md
+- [ ] ⬜ Evaluate both on held-out Town05 (generalization test)
+- [ ] ⬜ Document generalization gap baseline vs temporal
 
 ---
 
@@ -168,8 +188,12 @@ Status legend: ✅ Done | 🔄 In Progress | ⬜ Not Started | ⚠️ Blocked
 
 ## Immediate Next Actions (this week)
 
-1. ⬜ Push commits to GitHub (from Amarel)
-2. ⬜ Write `temporal/eval.py` unified evaluation script
-3. ⬜ Re-run temporal training with eval_l1_error logged
-4. ⬜ Run T=2 and T=8 ablations
-5. ⬜ Check if GitHub repo (when provided) has useful components
+1. ⬜ **Check Amarel scratch quota** → `ssh nd967@amarel.hpc.rutgers.edu` then `df -h /scratch/nd967`
+2. ⬜ **Push + download** → `git push` locally, then on Amarel: `git pull && sbatch scripts/download_lmdrive.sbatch`
+3. [x] ✅ ~~Decide stride policy~~ → DEC-005/DEC-013 documented
+4. [x] ✅ ~~Write `temporal/eval.py`~~ → done (EXP-014/015 already ran it)
+5. ⬜ **Baseline research training** → `sbatch scripts/slurm/baseline_train_research.sbatch` (after download)
+6. ⬜ **Temporal research training** → update `BASELINE_CKPT` in script, then `sbatch temporal_train_research.sbatch`
+7. ⬜ Run T=2, T=8, stride ablations — only after research-scale data is confirmed working
+
+> ⚠️  Steps 5–7 must follow Step 2. Do NOT report numbers from 210-frame runs in the thesis.

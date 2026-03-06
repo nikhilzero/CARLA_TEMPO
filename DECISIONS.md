@@ -69,18 +69,25 @@ _Last updated: 2026-03-06_
 
 ---
 
-## DEC-005 — frame_stride=1 (every consecutive frame)
+## DEC-005 — frame_stride=1 for debug; stride=5 for thesis-main runs
 
-**Decision**: Sample every frame (stride=1) for temporal windows.
+**Decision**: Use `stride=1` during pipeline development and ablations on the debug subset.
+For all thesis-quality training and evaluation runs on LMDrive data, use `stride=5`.
 
 **Rationale**:
-- At ~2 Hz, stride=1 gives maximum temporal resolution
-- Simplest to implement and reason about
-- Windows never skip data within the same route
+- The LMDrive dataset is collected at **10 Hz**
+- The original InterFuser paper collected data at **2 Hz**
+- At stride=1 with 10 Hz data: T=4 window covers 4 × 0.1s = **0.4 seconds** of history — far too short for meaningful velocity or intent estimation
+- At stride=5 with 10 Hz data: T=4 window covers 4 × 0.5s = **2.0 seconds** of history — matches the intended 2-second temporal context from DEC-004
+- All debug experiments (EXP-000–015) used stride=1 on 10 Hz data; results reflect 0.4s context, not 2s
 
-**Alternative considered**: stride=2 (skip 1 frame → 4 seconds of history with T=4, at coarser temporal resolution).
+**Concrete policy**:
+| Run type | stride | Effective temporal context (T=4, 10 Hz) |
+|---|---|---|
+| Debug / smoke / ablation | 1 | 0.4 sec |
+| **Thesis-main** | **5** | **2.0 sec** |
 
-**Ablation planned**: stride=1 vs stride=2 (Phase 4).
+**Ablation planned**: stride=1 vs stride=5 vs stride=10 on research-scale data (Phase 4).
 
 ---
 
@@ -168,12 +175,30 @@ _Last updated: 2026-03-06_
 
 ---
 
+## DEC-013 — Research-scale dataset scope (Towns + Weathers)
+
+**Decision**: For thesis-quality experiments, download and train on:
+- **Train towns**: Town01, Town02, Town03, Town04
+- **Val/test town**: Town05 (held out — never seen during training)
+- **Weather conditions**: [1, 3, 6, 8, 14, 18] (6 conditions covering daytime, rain, fog, overcast)
+- **Route size**: `tiny` (start); upgrade to `short` if quota allows
+
+**Rationale**:
+- 4 training towns provides distributional diversity without requiring terabytes of storage
+- Town05 is a natural generalization test (different road topology from Town01–04)
+- 6 weather conditions cover the main visual variation; more conditions require proportionally more compute
+- `tiny` routes have enough frames per route (~30–100) to support T=4 temporal windows
+
+**Alternative considered**: All 8 towns + all 14 weathers (full LMDrive). Exceeds typical Amarel scratch quota (~500 GB) and would require multi-day download.
+
+---
+
 ## OPEN DECISIONS (not yet made)
 
 | ID | Question | Options | Status |
 |---|---|---|---|
-| OD-001 | What T gives best performance? | T=2, T=4, T=8 | UNKNOWN — ablation needed |
+| OD-001 | What T gives best performance? | T=2, T=4, T=8 | UNKNOWN — ablation needed (on research-scale data) |
 | OD-002 | Approach 1 vs Approach 2 for fusion? | Concat vs CrossAttn | UNKNOWN — Approach 2 not implemented |
 | OD-003 | Is CARLA server available on Amarel for closed-loop eval? | Available / Not available | UNKNOWN — verify with `module avail` |
-| OD-004 | Should we train on all available towns? | Town01-only vs multi-town | UNKNOWN — check dataset_index.txt |
+| OD-004 | Should we train on all available towns? | Town01-only vs multi-town | **DECIDED** → see DEC-013 |
 | OD-005 | Use the new GitHub repo (when provided) fully, partially, or as reference? | Full / Partial / Reference | UNKNOWN — pending repo analysis |
