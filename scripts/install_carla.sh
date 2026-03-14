@@ -28,7 +28,7 @@ cd "${CARLA_DIR}"
 # ---- 2. Download CARLA (skip if already downloaded) ----
 if [ ! -f "CarlaUE4.sh" ]; then
     echo "[1/4] Downloading CARLA 0.9.10.1 (~12 GB)..."
-    wget -q --show-progress https://tiny.carla.org/carla-0-9-10-1-linux -O CARLA_0.9.10.1.tar.gz
+    wget -q https://tiny.carla.org/carla-0-9-10-1-linux -O CARLA_0.9.10.1.tar.gz
     echo "[1/4] Extracting..."
     tar -xf CARLA_0.9.10.1.tar.gz
     rm CARLA_0.9.10.1.tar.gz
@@ -40,7 +40,7 @@ fi
 # ---- 3. Download AdditionalMaps (Town06, Town07, Town10) ----
 if [ ! -d "Import" ] || [ -z "$(ls Import/*.tar.gz 2>/dev/null)" ]; then
     echo "[2/4] Downloading AdditionalMaps (~3 GB)..."
-    wget -q --show-progress https://tiny.carla.org/additional-maps-0-9-10-1-linux -O AdditionalMaps_0.9.10.1.tar.gz
+    wget -q https://tiny.carla.org/additional-maps-0-9-10-1-linux -O AdditionalMaps_0.9.10.1.tar.gz
     tar -xf AdditionalMaps_0.9.10.1.tar.gz
     rm AdditionalMaps_0.9.10.1.tar.gz
     echo "[2/4] AdditionalMaps extracted."
@@ -48,13 +48,23 @@ else
     echo "[2/4] AdditionalMaps already present — skipping."
 fi
 
-# ---- 4. Install CARLA Python API ----
+# ---- 4. Install CARLA Python API via the bundled .egg ----
 echo "[3/4] Installing CARLA Python API..."
 source ~/miniconda3/bin/activate ${CONDA_ENV}
 
-# pip package works with Python 3.8 (unlike the .egg which is 3.7-only)
-pip install carla==0.9.10.1 --quiet
-echo "[3/4] CARLA Python API installed."
+EGG="${CARLA_DIR}/PythonAPI/carla/dist/carla-0.9.10-py3.7-linux-x86_64.egg"
+if [ ! -f "${EGG}" ]; then
+    echo "ERROR: egg not found at ${EGG}"
+    exit 1
+fi
+
+# Install via easy_install (works with Python 3.8 despite the py3.7 filename)
+easy_install "${EGG}" 2>/dev/null || pip install "${EGG}" --quiet || true
+
+# Also write a .pth file as fallback so the egg is always on PYTHONPATH
+SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+echo "${EGG}" > "${SITE_PACKAGES}/carla.pth"
+echo "[3/4] CARLA Python API installed (egg + .pth)."
 
 # ---- 5. Install leaderboard dependencies ----
 echo "[4/4] Installing leaderboard dependencies..."
