@@ -4,12 +4,7 @@
 #
 # Research-scale: Town01-04 train, Town05 val, 6 weather conditions.
 # Uses stride=5 to achieve 2-second temporal context at 10 Hz (DEC-005/DEC-013).
-# Pretrained backbone from baseline_train_research run (update BASELINE_CKPT).
-#
-# Prerequisites:
-#   1. sbatch scripts/download_lmdrive.sbatch (and wait for completion)
-#   2. sbatch scripts/slurm/baseline_train_research.sbatch (get research baseline ckpt)
-#   3. Update BASELINE_CKPT below to point to the research baseline model_best.pth.tar
+# RES-001 baseline checkpoint: baseline_research model_best.pth.tar
 #
 # Submit: sbatch scripts/slurm/temporal_train_research.sbatch
 # =============================================================================
@@ -20,6 +15,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=48:00:00
+#SBATCH --requeue
 #SBATCH --output=/scratch/nd967/CARLA_TEMPO/logs/temporal_research_%j.out
 #SBATCH --error=/scratch/nd967/CARLA_TEMPO/logs/temporal_research_%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -31,9 +27,8 @@ PROJECT_DIR="/scratch/nd967/CARLA_TEMPO"
 DATA_ROOT="${DATA_ROOT:-${PROJECT_DIR}/InterFuser/dataset}"
 OUTPUT_DIR="${PROJECT_DIR}/runs/temporal"
 
-# UPDATE THIS after baseline_train_research completes:
-# Point to the research-scale baseline checkpoint, NOT the old debug one.
-BASELINE_CKPT="${BASELINE_CKPT:-${PROJECT_DIR}/runs/baseline/baseline_research/model_best.pth.tar}"
+# RES-001 research-scale baseline checkpoint
+BASELINE_CKPT="/scratch/nd967/CARLA_TEMPO/runs/baseline/20260307-082126-interfuser_baseline-224-baseline_research/model_best.pth.tar"
 
 CONDA_ENV="interfuser"
 
@@ -55,16 +50,26 @@ if [ ! -f "${DATA_ROOT}/dataset_index.txt" ]; then
     exit 1
 fi
 
+if [ ! -f "${BASELINE_CKPT}" ]; then
+    echo "ERROR: Research baseline checkpoint not found at ${BASELINE_CKPT}"
+    echo "  Run baseline_train_research.sbatch first and verify it completed."
+    exit 1
+fi
+
 # Verify multi-town data is present
 for town in 01 02 03 04 05; do
     count=$(grep -c "town${town}" "${DATA_ROOT}/dataset_index.txt" || true)
     echo "  Town${town}: ${count} routes in index"
 done
 
-if [ ! -f "${BASELINE_CKPT}" ]; then
-    echo "WARNING: research baseline checkpoint not found at ${BASELINE_CKPT}"
-    echo "  Falling back to debug checkpoint (not recommended for thesis runs)"
-    BASELINE_CKPT="/scratch/nd967/interfuser_project/InterFuser/interfuser/output/20260210-110341-interfuser_baseline-224-real_data_test/model_best.pth.tar"
+# Auto-resume from last checkpoint if available (handles SLURM preemption)
+RESUME_ARG=""
+LATEST_RUN=$(ls -td ${OUTPUT_DIR}/*temporal_research_T4_s5* 2>/dev/null | head -1)
+if [ -n "${LATEST_RUN}" ] && [ -f "${LATEST_RUN}/last.pth.tar" ]; then
+    RESUME_ARG="--resume ${LATEST_RUN}/last.pth.tar"
+    echo "Resuming from: ${LATEST_RUN}/last.pth.tar"
+else
+    echo "No checkpoint found — starting fresh."
 fi
 
 mkdir -p "${OUTPUT_DIR}" "${PROJECT_DIR}/logs"
@@ -93,7 +98,8 @@ python -m temporal.train \
     --save-interval 1 \
     --experiment temporal_research_T4_s5 \
     --output "${OUTPUT_DIR}" \
-    --pretrained-backbone "${BASELINE_CKPT}"
+    --pretrained-backbone "${BASELINE_CKPT}" \
+    ${RESUME_ARG}
 
 echo "=========================================="
 echo "Temporal research training DONE."
