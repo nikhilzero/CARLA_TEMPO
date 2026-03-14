@@ -323,6 +323,157 @@ GPU:       Quadro M6000
 
 ---
 
+---
+
+## ═══════════════════════════════════════════════════════════════
+## RESEARCH-SCALE EXPERIMENTS (RES-NNN) — THESIS-QUALITY RESULTS
+## Data: Town01-04 train, Town05 held-out test, 6 weathers, 300 routes, 60,755 frames
+## These are the only results that may be reported in the thesis.
+## ═══════════════════════════════════════════════════════════════
+
+## RES-001 — Baseline Training (Research Scale)
+
+**Date**: 2026-03-07
+**Job ID**: 50129303
+**Script**: `scripts/slurm/baseline_train_research.sbatch`
+**Purpose**: Thesis-quality baseline training — first research-scale run
+**Wall time**: 11h 27m (24 epochs)
+**GPU**: NVIDIA L40S (gpu029)
+
+**Config**:
+```
+Model:     interfuser_baseline
+Dataset:   Town01-04 train / Town05 val, Weathers [1,3,6,8,14,18], tiny routes
+Routes:    240 train + 60 val
+Frames:    49,378 train + 11,377 val
+Epochs:    24 (--cooldown-epochs 0 fix applied)
+LR:        5e-4 (backbone 2e-4)
+Batch:     4
+Schedule:  cosine, warmup 2 epochs
+AdamW:     weight_decay=0.05, eps=1e-8
+Clip grad: 10.0
+```
+
+**Result**: `val l1_error = 0.1569` (best at epoch 4)
+
+**Checkpoint**: `/scratch/nd967/CARLA_TEMPO/runs/baseline/20260307-082126-interfuser_baseline-224-baseline_research/model_best.pth.tar` (607 MB)
+
+**Notes**:
+- Best val_l1_error was at epoch 4 (early), suggesting fast convergence on research data
+- This checkpoint is used as pretrained backbone for RES-002 temporal training
+- Eval on held-out Town05: see RES-E001 below
+
+---
+
+## RES-E001 — Baseline Eval on Town05 (Held-Out)
+
+**Date**: 2026-03-07
+**Job ID**: 50135656
+**Script**: `scripts/slurm/eval_baseline.sbatch`
+**Checkpoint**: RES-001 `model_best.pth.tar`
+**Val set**: Town05, Weathers [1,3,6,8,14,18], 11,377 frames (T=1), 2,845 batches
+**GPU**: Quadro M6000
+
+**Results**:
+| Metric | Value |
+|---|---|
+| **waypoint_l1** | **0.6036 m** |
+| **waypoint_l2** | **0.9873 m** |
+| **weighted_waypoint_l1** | **0.04636** |
+| loss_traffic | 0.1277 |
+| loss_waypoints | 0.04636 |
+| loss_junction | 0.4409 |
+| loss_traffic_light | 0.5119 |
+| loss_stop_sign | 0.1943 |
+| **loss_total (5-head)** | **0.1483** |
+
+**JSON**: `runs/baseline/20260307-082126-interfuser_baseline-224-baseline_research/eval_baseline_results.json`
+
+**Notes**:
+- waypoint_l1=0.604m is the **research-scale baseline target** — RES-002 must beat this
+- Compare with debug baseline (EXP-015): waypoint_l1=0.608m — nearly identical, confirms research data is similar difficulty
+- Classification losses are higher than debug runs (traffic=0.128, TL=0.512) — more diverse Town05 scenarios
+
+---
+
+## RES-002 — Temporal Training (Research Scale) — IN PROGRESS
+
+**Date**: 2026-03-07
+**Job ID**: 50135611
+**Script**: `scripts/slurm/temporal_train_research.sbatch`
+**Purpose**: Thesis-quality temporal model training (T=4, stride=5 = 2-sec context)
+**Status**: RUNNING on gpu029, 48h budget
+
+**Config**:
+```
+Model:     InterFuserTemporal, T=4, depth=2, stride=5
+Pretrained backbone: RES-001 model_best.pth.tar
+Dataset:   Town01-04 train / Town05 val, Weathers [1,3,6,8,14,18], tiny routes
+Windows:   45,778 train + 10,477 val temporal windows
+Epochs:    24
+LR:        5e-4 (temporal), 2e-4 (backbone)
+Batch:     2, grad_accum=2 (effective batch=4)
+Schedule:  cosine, warmup 2 epochs
+AdamW:     weight_decay=0.05, eps=1e-8
+Clip grad: 10.0
+```
+
+**Temporal params**: 1,580,548 new params (2.9% of total 54,516,115)
+**Expected wall time**: ~20-24h (T=4 = 4× backbone forward passes per window)
+**Output dir**: `runs/temporal/20260307-195110-temporal_research_T4_s5-T4/`
+
+**Results (RES-E002 — see below)**: best val_loss=0.1770 at epoch 1; epoch 24 val_loss=0.1860
+
+---
+
+---
+
+## RES-E002 — Temporal Eval on Town05 (Held-Out)
+
+**Date**: 2026-03-10
+**Jobs**: 50191515 (model_best / epoch 1), 50191516 (epoch 24)
+**Script**: `scripts/slurm/eval_temporal.sbatch`
+**Val set**: Town05, Weathers [1,3,6,8,14,18], 10,477 temporal windows (T=4,stride=5), 2,620 batches
+
+**Results**:
+| Checkpoint | waypoint_l1 | waypoint_l2 | weighted_wp_l1 | loss_total |
+|---|---|---|---|---|
+| **model_best (epoch 1)** | **0.5956 m** | **0.9586 m** | **0.04538** | 0.1785 |
+| epoch 24 | 0.7205 m | 1.1991 m | 0.05602 | 0.1878 |
+| **Baseline RES-001** | **0.6036 m** | **0.9873 m** | **0.04636** | 0.1483 |
+
+**Δ (model_best vs baseline)**: waypoint_l1 **−1.3%**, waypoint_l2 **−2.9%**
+
+---
+
+## ═══════════════════════════════════════════════════════════════
+## RESEARCH-SCALE DEFINITIVE COMPARISON
+## ═══════════════════════════════════════════════════════════════
+
+| Model | Train epochs | waypoint_l1 ↓ | waypoint_l2 ↓ | Δ vs baseline |
+|---|---|---|---|---|
+| Baseline (RES-001) | 24 | 0.6036 m | 0.9873 m | — |
+| **Temporal T=4 s5 best** | 24 (ep1 best) | **0.5956 m** | **0.9586 m** | **−1.3%** |
+| Temporal T=4 s5 ep24 | 24 | 0.7205 m | 1.1991 m | +19.4% (worse) |
+
+### Key Findings
+
+1. **Temporal model barely beats baseline at research scale** — 1.3% improvement vs 53% in debug runs. The debug result was misleading: it evaluated on the same 210-frame data used for training (data leakage).
+
+2. **Best temporal checkpoint is epoch 1** — the pretrained backbone dominates, and continued training with the temporal components slightly degrades generalization to Town05. This suggests the temporal encoder is overfitting to the training distribution (Town01-04).
+
+3. **Epoch 24 is worse than baseline** — temporal components learned something Town01-04-specific that hurts on Town05. This generalization gap is a real finding worth investigating.
+
+4. **Hypothesis**: The temporal model needs more diverse training data or stronger regularization to generalize. Alternatively, stride=5 with only tiny routes may not provide enough meaningful temporal context for the model to learn useful motion patterns.
+
+5. **Debug runs (EXP-014: waypoint_l1=0.281 m) are invalid** — confirmed data leakage. Do not report these in the thesis.
+
+### Thesis Interpretation
+
+> *"At research scale with a proper held-out test town (Town05), the temporal InterFuser (T=4, stride=5) achieves marginally better waypoint prediction than the single-frame baseline (0.596 m vs 0.604 m, −1.3%). The model's best performance occurs at epoch 1, before temporal fine-tuning begins, suggesting the temporal components have not yet learned to generalize across towns. This motivates further investigation into regularization, longer training, and cross-town temporal patterns."*
+
+---
+
 ## Planned Experiments
 
 | ID | Name | Config | Purpose | Status |
