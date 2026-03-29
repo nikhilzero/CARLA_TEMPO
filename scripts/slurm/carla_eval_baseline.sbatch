@@ -37,6 +37,7 @@ echo "=========================================="
 module purge
 module load cuda/12.1.0
 source ~/miniconda3/bin/activate ${CONDA_ENV}
+export LD_LIBRARY_PATH=~/miniconda3/envs/${CONDA_ENV}/lib:${LD_LIBRARY_PATH}
 
 # ---- Verify CARLA is installed ----
 if [ ! -f "${CARLA_ROOT}/CarlaUE4.sh" ]; then
@@ -46,6 +47,10 @@ if [ ! -f "${CARLA_ROOT}/CarlaUE4.sh" ]; then
 fi
 
 mkdir -p "${RESULTS_DIR}" "${PROJECT_DIR}/logs"
+
+# ---- Sync agent files from tracked location into leaderboard ----
+cp "${PROJECT_DIR}/temporal/agents/interfuser_config.py" "${PROJECT_DIR}/InterFuser/leaderboard/team_code/interfuser_config.py"
+echo "Agent files synced."
 
 # ---- Set PYTHONPATH for leaderboard ----
 export CARLA_ROOT="${CARLA_ROOT}"
