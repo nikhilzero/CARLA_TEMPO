@@ -44,6 +44,7 @@ for p in [_PROJECT_ROOT, _INTERFUSER_PKG]:
         sys.path.insert(0, p)
 
 from temporal.models.interfuser_temporal import build_interfuser_temporal
+from temporal.models.interfuser_temporal_attn import build_interfuser_temporal_crossattn
 
 SAVE_PATH = os.environ.get("SAVE_PATH", "eval")
 IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
@@ -109,13 +110,23 @@ class TemporalAgent(autonomous_agent.AutonomousAgent):
         # We sample every frame_stride-th entry to build the temporal window.
         self._frame_buffer = deque(maxlen=self.num_frames * self.frame_stride)
 
-        # Load temporal model
-        print(f"Loading InterFuserTemporal from: {self.config.model_path}")
-        self.net = build_interfuser_temporal(
-            num_frames=self.num_frames,
-            temporal_encoder_depth=self.config.temporal_depth,
-            pretrained_path=None,
-        )
+        # Load temporal model (support both Approach 1 and Approach 2)
+        model_type = getattr(self.config, "model_type", "concat")
+        dropout    = getattr(self.config, "dropout", 0.1)
+        print(f"Loading InterFuserTemporal (model_type={model_type}) from: {self.config.model_path}")
+        if model_type == "crossattn":
+            self.net = build_interfuser_temporal_crossattn(
+                num_frames=self.num_frames,
+                num_attn_layers=self.config.temporal_depth,
+                dropout=dropout,
+                pretrained_path=None,
+            )
+        else:
+            self.net = build_interfuser_temporal(
+                num_frames=self.num_frames,
+                temporal_encoder_depth=self.config.temporal_depth,
+                pretrained_path=None,
+            )
         ckpt = torch.load(self.config.model_path, map_location="cpu")
         state_dict = ckpt.get("state_dict", ckpt.get("model", ckpt))
         missing, unexpected = self.net.load_state_dict(state_dict, strict=False)

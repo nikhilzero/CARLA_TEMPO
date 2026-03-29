@@ -53,6 +53,7 @@ class InterFuserTemporal(nn.Module):
         base_model,
         num_frames: int = 4,
         temporal_encoder_depth: int = 2,
+        dropout: float = 0.1,
     ):
         super().__init__()
         self.num_frames = num_frames
@@ -72,7 +73,7 @@ class InterFuserTemporal(nn.Module):
             d_model=self.embed_dim,
             nhead=8,
             dim_feedforward=self.embed_dim * 4,
-            dropout=0.1,
+            dropout=dropout,
             activation='gelu',
             batch_first=False,  # (seq, batch, dim) format like InterFuser
         )
@@ -216,6 +217,7 @@ class InterFuserTemporal(nn.Module):
 def build_interfuser_temporal(
     num_frames: int = 4,
     temporal_encoder_depth: int = 2,
+    dropout: float = 0.1,
     pretrained_path: str = None,
 ) -> InterFuserTemporal:
     """
@@ -244,6 +246,7 @@ def build_interfuser_temporal(
         base,
         num_frames=num_frames,
         temporal_encoder_depth=temporal_encoder_depth,
+        dropout=dropout,
     )
 
     # Count new parameters

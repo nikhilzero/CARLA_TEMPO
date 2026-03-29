@@ -36,6 +36,7 @@ from timm.data import create_carla_dataset, create_carla_loader
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
 from temporal.models.interfuser_temporal import build_interfuser_temporal
+from temporal.models.interfuser_temporal_attn import build_interfuser_temporal_crossattn
 from temporal.data.temporal_dataset import (
     TemporalWindowDataset,
     collate_temporal,
@@ -59,9 +60,13 @@ def parse_args():
     p.add_argument("--val-weathers", type=int, nargs="+", default=[18])
 
     # Model
+    p.add_argument("--model-type", default="concat",
+                   choices=["concat", "crossattn"],
+                   help="Temporal fusion strategy: concat (Approach 1) or crossattn (Approach 2)")
     p.add_argument("--temporal-frames", type=int, default=4, help="Window size T")
     p.add_argument("--frame-stride", type=int, default=1)
-    p.add_argument("--temporal-depth", type=int, default=2, help="Temporal encoder layers")
+    p.add_argument("--temporal-depth", type=int, default=2, help="Temporal encoder layers (concat) or cross-attn layers (crossattn)")
+    p.add_argument("--dropout", type=float, default=0.1, help="Dropout in temporal encoder/cross-attn blocks")
     p.add_argument("--pretrained-backbone", default=None, help="Path to baseline checkpoint")
 
     # Training
@@ -267,11 +272,21 @@ def main():
     print(f"Device: {device}")
 
     # ---- Model ----
-    model = build_interfuser_temporal(
-        num_frames=args.temporal_frames,
-        temporal_encoder_depth=args.temporal_depth,
-        pretrained_path=args.pretrained_backbone,
-    )
+    if args.model_type == "crossattn":
+        model = build_interfuser_temporal_crossattn(
+            num_frames=args.temporal_frames,
+            num_attn_layers=args.temporal_depth,
+            dropout=args.dropout,
+            pretrained_path=args.pretrained_backbone,
+        )
+    else:
+        model = build_interfuser_temporal(
+            num_frames=args.temporal_frames,
+            temporal_encoder_depth=args.temporal_depth,
+            dropout=args.dropout,
+            pretrained_path=args.pretrained_backbone,
+        )
+    print(f"Model type: {args.model_type}  dropout={args.dropout}")
     model = model.to(device)
 
     # ---- Optimizer: lower LR for pretrained backbone, full LR for new params ----

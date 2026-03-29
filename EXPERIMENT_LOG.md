@@ -476,12 +476,39 @@ Clip grad: 10.0
 
 ## Planned Experiments
 
-| ID | Name | Config | Purpose | Status |
+| ID | Name | Config | Script | Status |
 |---|---|---|---|---|
-| EXP-010 | temporal_stride2 | T=4, stride=2 | Ablation: frame stride | ⬜ Planned |
-| EXP-011 | temporal_depth1 | T=4, depth=1 | Ablation: encoder depth | ⬜ Planned |
-| EXP-012 | temporal_depth4 | T=4, depth=4 | Ablation: encoder depth | ⬜ Planned |
-| EXP-013 | temporal_approach2 | T=4, cross-attn | Approach 2 test | ⬜ Planned |
+| RES-003 | temporal_attn_T4_s5 | Approach 2 (cross-attn), T=4, stride=5, Town01-04 | `temporal_train_attn_research.sbatch` | ⬜ Ready to submit |
+| RES-004 | temporal_reg_T4_s5 | Approach 1 + dropout=0.3, wd=0.1, lr=0.00025 | `temporal_train_reg_research.sbatch` | ⬜ Ready to submit |
+| RES-005 | ablation_T2_research | T=2, stride=5, research scale | `ablation_T2_research.sbatch` | ⬜ Ready to submit |
+| RES-006 | ablation_T8_research | T=8, stride=5, research scale | `ablation_T8_research.sbatch` | ⬜ Ready to submit |
+| RES-007 | ablation_stride1_research | T=4, stride=1, research scale | `ablation_stride1_research.sbatch` | ⬜ Ready to submit |
+| CARLA-001 | carla_eval_baseline | Closed-loop eval, baseline | `carla_eval_baseline.sbatch` | 🔄 Running (job 50651330) |
+| CARLA-002 | carla_eval_temporal | Closed-loop eval, temporal T=4 | `carla_eval_temporal.sbatch` | 🔄 Running (job 50651331) |
+
+### EXP-010 (debug only): temporal_stride2 — superseded by RES-007 (research scale)
+### EXP-011/012: depth ablations — lower priority; address overfitting first
+### EXP-013: Approach 2 (cross-attn) — implemented as RES-003, script ready
+
+## Regularization Investigation Plan
+
+The RES-002 result (epoch 1 best, epoch 24 worse than baseline) suggests the temporal
+encoder overfits the training distribution (Town01-04) and hurts Town05 generalization.
+
+Three experiments to investigate:
+1. **RES-004** (regularization): dropout=0.3, weight_decay=0.1, lower temporal LR
+   → Tests if stronger regularization allows temporal encoder to generalize
+2. **RES-003** (Approach 2 cross-attn): query-based attention to past frames
+   → More selective than concat; may generalize better by construction
+3. **RES-007** (stride=1): dense sampling (0.4s vs 2.0s context)
+   → Tests if shorter but denser temporal context generalizes better to unseen towns
+
+## CARLA Closed-Loop Evaluation Status (2026-03-29)
+
+Jobs 50651330 (baseline) and 50651331 (temporal T=4) submitted and RUNNING.
+Previous attempts (50651090–50651110) failed with KeyError: 'ROUTES' in interfuser_agent.py
+because SAVE_PATH defaulted to 'eval' (non-None), triggering unconditional ROUTES access.
+Current runs have ROUTES env var set correctly — expected to complete by end of day.
 
 ---
 
