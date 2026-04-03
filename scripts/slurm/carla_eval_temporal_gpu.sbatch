@@ -47,6 +47,23 @@ export LD_LIBRARY_PATH=~/miniconda3/envs/${CONDA_ENV}/lib:${LD_LIBRARY_PATH}
 echo "=== GPU Status ==="
 nvidia-smi --query-gpu=index,name,memory.free,memory.total --format=csv 2>/dev/null || echo "nvidia-smi failed"
 
+# ---- Find working GPUs (skip broken PCI devices) ----
+WORKING_GPUS=""
+NUM_GPUS=$(nvidia-smi --list-gpus 2>/dev/null | wc -l)
+for gpu_idx in $(seq 0 $((NUM_GPUS - 1))); do
+    if nvidia-smi -i ${gpu_idx} --query-gpu=index --format=csv,noheader 2>/dev/null | grep -q "[0-9]"; then
+        WORKING_GPUS="${WORKING_GPUS}${gpu_idx},"
+    fi
+done
+WORKING_GPUS=${WORKING_GPUS%,}
+if [ -z "${WORKING_GPUS}" ]; then
+    echo "ERROR: No working GPUs found on $(hostname)"
+    nvidia-smi 2>&1 || true
+    exit 1
+fi
+echo "Working GPUs: ${WORKING_GPUS}"
+export CUDA_VISIBLE_DEVICES="${WORKING_GPUS}"
+
 # ---- Verify CARLA ----
 if [ ! -f "${CARLA_ROOT}/CarlaUE4.sh" ]; then
     echo "ERROR: CARLA not found at ${CARLA_ROOT}"
@@ -60,7 +77,7 @@ export CARLA_ROOT="${CARLA_ROOT}"
 export PYTHONPATH="${CARLA_ROOT}/PythonAPI:${CARLA_ROOT}/PythonAPI/carla:${PROJECT_DIR}/InterFuser/leaderboard:${PROJECT_DIR}/InterFuser/leaderboard/team_code:${PROJECT_DIR}/InterFuser/scenario_runner:${PROJECT_DIR}/InterFuser/interfuser:${PROJECT_DIR}"
 
 # ---- Start CARLA server ----
-echo "Starting CARLA on port ${PORT}..."
+echo "Starting CARLA on port ${PORT} with CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}..."
 SDL_VIDEODRIVER=offscreen "${CARLA_ROOT}/CarlaUE4.sh" \
     --world-port=${PORT} \
     -RenderOffScreen \
