@@ -42,6 +42,8 @@ module purge
 module load cuda/12.1.0
 source ~/miniconda3/bin/activate ${CONDA_ENV}
 export LD_LIBRARY_PATH=~/miniconda3/envs/${CONDA_ENV}/lib:${LD_LIBRARY_PATH}
+export SDL_VIDEODRIVER=offscreen
+export SDL_HINT_CUDA_DEVICE=0
 
 # ---- GPU status ----
 echo "=== GPU Status ==="
