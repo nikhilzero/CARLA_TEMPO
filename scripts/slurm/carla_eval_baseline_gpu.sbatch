@@ -44,6 +44,9 @@ source ~/miniconda3/bin/activate ${CONDA_ENV}
 export LD_LIBRARY_PATH=~/miniconda3/envs/${CONDA_ENV}/lib:${LD_LIBRARY_PATH}
 export SDL_VIDEODRIVER=offscreen
 export SDL_HINT_CUDA_DEVICE=0
+# Unique save dir per task — avoids FileExistsError when 2 routes in same batch
+# share the same ROUTES filename stem and run within the same second
+export SAVE_PATH="/tmp/carla_eval_baseline_${BATCH_ID}"
 
 # ---- GPU status ----
 echo "=== GPU Status ==="
