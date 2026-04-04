@@ -59,6 +59,8 @@ def parse_args():
     p.add_argument("--val-weathers", type=int, nargs="+", default=[18])
 
     # Model
+    p.add_argument("--model-type", choices=["concat", "crossattn"], default="concat", help="Temporal fusion type")
+    p.add_argument("--dropout", type=float, default=0.1, help="Dropout for temporal encoder")
     p.add_argument("--temporal-frames", type=int, default=4, help="Window size T")
     p.add_argument("--frame-stride", type=int, default=1)
     p.add_argument("--temporal-depth", type=int, default=2, help="Temporal encoder layers")
@@ -267,11 +269,20 @@ def main():
     print(f"Device: {device}")
 
     # ---- Model ----
-    model = build_interfuser_temporal(
-        num_frames=args.temporal_frames,
-        temporal_encoder_depth=args.temporal_depth,
-        pretrained_path=args.pretrained_backbone,
-    )
+    if args.model_type == "crossattn":
+        from temporal.models.interfuser_temporal_attn import build_interfuser_temporal_crossattn
+        model = build_interfuser_temporal_crossattn(
+            num_frames=args.temporal_frames,
+            temporal_encoder_depth=args.temporal_depth,
+            pretrained_path=args.pretrained_backbone,
+            dropout=args.dropout,
+        )
+    else:
+        model = build_interfuser_temporal(
+            num_frames=args.temporal_frames,
+            temporal_encoder_depth=args.temporal_depth,
+            pretrained_path=args.pretrained_backbone,
+        )
     model = model.to(device)
 
     # ---- Optimizer: lower LR for pretrained backbone, full LR for new params ----
