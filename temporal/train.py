@@ -273,7 +273,7 @@ def main():
         from temporal.models.interfuser_temporal_attn import build_interfuser_temporal_crossattn
         model = build_interfuser_temporal_crossattn(
             num_frames=args.temporal_frames,
-            temporal_encoder_depth=args.temporal_depth,
+            num_attn_layers=args.temporal_depth,
             pretrained_path=args.pretrained_backbone,
             dropout=args.dropout,
         )
