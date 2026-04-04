@@ -282,6 +282,7 @@ def main():
             num_frames=args.temporal_frames,
             temporal_encoder_depth=args.temporal_depth,
             pretrained_path=args.pretrained_backbone,
+            dropout=args.dropout,
         )
     model = model.to(device)
 

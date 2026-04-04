@@ -55,7 +55,7 @@ if [ ! -f "${BASELINE_CKPT}" ]; then
 fi
 
 RESUME_ARG=""
-LATEST_RUN=$(ls -td ${OUTPUT_DIR}/*ablation_T4_stride1_research* 2>/dev/null | head -1)
+LATEST_RUN=$(ls -td ${OUTPUT_DIR}/*ablation_T4_stride1_research_d03* 2>/dev/null | head -1)
 if [ -n "${LATEST_RUN}" ] && [ -f "${LATEST_RUN}/last.pth.tar" ]; then
     RESUME_ARG="--resume ${LATEST_RUN}/last.pth.tar"
     echo "Resuming from: ${LATEST_RUN}/last.pth.tar"
@@ -79,9 +79,9 @@ python -m temporal.train \
     --warmup-epochs 2 \
     --batch-size 2 \
     --grad-accum 2 \
-    --lr 0.0005 \
-    --backbone-lr 0.0002 \
-    --weight-decay 0.05 \
+    --lr 0.00025 \
+    --backbone-lr 0.0001 \
+    --weight-decay 0.1 \
     --clip-grad 10 \
     --workers 8 \
     --log-interval 50 \
