@@ -291,6 +291,27 @@ def main():
     brk03 = sum(r["brake"] for r in results_d03) / len(results_d03)
     print(f"  {'brake rate':<23} {brk01:>10.1%} {brk03:>10.1%}")
 
+    # ── Simulate d01 with tl_calibration_threshold=0.55 patch ─────────────────
+    TL_PATCH = 0.55
+    print(f"\n{'='*70}")
+    print(f"  PATCHED SIMULATION: d01 with tl_calibration_threshold={TL_PATCH}")
+    print(f"  (clamp tl_state to 0 if < {TL_PATCH} — mirrors temporal_d01_patched_config.py)")
+    print(f"{'='*70}")
+    patched_brake = 0
+    for r in results_d01:
+        tl_patched = 0.0 if r["tl_state"] < TL_PATCH else r["tl_state"]
+        b, _, reason = simulate_controller(
+            np.array([[r["wp_mean_x"], r["wp_mean_y"]]] * 10),  # approximate
+            r["junction"], tl_patched, r["stop_sign"]
+        )
+        if b:
+            patched_brake += 1
+    print(f"  Patched brake rate: {patched_brake}/{len(results_d01)} "
+          f"({100*patched_brake/len(results_d01):.0f}%)")
+    print(f"  Original brake rate: {sum(r['brake'] for r in results_d01)}/{len(results_d01)} (100%)")
+    print(f"\n  → If patched brake rate ≈ 0%, the vehicle WOULD drive with this fix.")
+    print(f"  → CARLA eval submitted as carla_eval_d01_patched_gpu.sbatch to confirm.")
+
     print("\nDone.")
 
 
