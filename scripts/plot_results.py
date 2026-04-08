@@ -35,7 +35,7 @@ data = {
     "Baseline":       [0.406,  4.910,  2.788,  6.192,  5.960, 11.864,  1.806,  0.397,  6.291,  1.898],
     "T=2, d=0.3":    [3.399, 12.014,  4.391,  4.472,  0.222, 16.393,  3.402,  8.415,  0.764,  3.246],
     "T=4, d=0.3":    [9.215,  7.578,  3.035, 11.291,  0.034, 24.393,  5.997, 10.393,  5.801,  3.833],
-    "Stride=1, d=0.3": [1.973, 8.410,  4.253,  3.348,  0.061, 22.003,  3.934,  5.004,   None,   None],
+    "Stride=1, d=0.3": [1.973, 8.410,  4.253,  3.348,  0.061, 22.003,  3.934,  5.004,  11.875,  3.871],
     # d=0.1 models — all DS=0.0
     "T=2, d=0.1":    [0.0]*10,
     "T=4, d=0.1":    [0.0]*10,
@@ -90,7 +90,7 @@ def plot_avg_ds():
     ax.set_xticklabels(models, rotation=30, ha="right", fontsize=10)
     ax.set_ylabel("Avg Driving Score (DS)", fontsize=12)
     ax.set_title("CARLA Closed-Loop Evaluation — Average Driving Score by Model\n"
-                 "(Town05, 10 routes; ✦ = d=0.3 models drive; d=0.1 models DS=0.0)", fontsize=11)
+                 "(Town05, 10 routes; d=0.3 models drive; d=0.1 models DS=0.0)", fontsize=11)
     ax.set_ylim(0, max(avgs) * 1.18)
 
     legend_patches = [
@@ -208,7 +208,7 @@ def plot_stride_comparison():
                  "Stride=5: 2-second history window; Stride=1: dense consecutive frames", fontsize=11)
     ax.set_ylim(0, max(vals) * 1.25)
 
-    note = "* Stride=1 d=0.3 uses 8/10 routes\n  (batch 4 eval pending)"
+    note = "Stride=1 d=0.3: 10/10 routes complete"
     ax.text(0.97, 0.97, note, transform=ax.transAxes, ha="right", va="top",
             fontsize=8.5, color="gray", style="italic")
     plt.tight_layout()
