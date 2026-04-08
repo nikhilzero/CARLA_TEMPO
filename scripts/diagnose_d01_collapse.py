@@ -48,6 +48,7 @@ for p in [REPO_ROOT, INTERFUSER_PKG]:
         sys.path.insert(0, p)
 
 from timm.data import create_carla_dataset, create_carla_loader
+from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from temporal.models.interfuser_temporal import build_interfuser_temporal
 from temporal.data.temporal_dataset import (
     TemporalWindowDataset,
@@ -124,14 +125,30 @@ def load_model(ckpt_path, label):
 
 def build_dataset():
     print(f"\nBuilding dataset from: {DATA_DIR}")
+    # Mirrors temporal/train.py exactly
     base_ds = create_carla_dataset(
-        "",
+        "carla",
         root=DATA_DIR,
         towns=[5],
         weathers=[18],
-        img_size=224,
-        multi_view=True,
         with_lidar=True,
+        multi_view=True,
+        augment_prob=0.0,
+    )
+    print(f"  Base dataset size: {len(base_ds)}")
+    # create_carla_loader sets rgb_transform / multi_view_transform on base_ds
+    create_carla_loader(
+        base_ds,
+        input_size=[3, 224, 224],
+        batch_size=1,
+        multi_view_input_size=[3, 128, 128],
+        is_training=False,
+        scale=[1.0, 1.0],
+        color_jitter=0.0,
+        mean=IMAGENET_DEFAULT_MEAN,
+        std=IMAGENET_DEFAULT_STD,
+        num_workers=1,
+        persistent_workers=False,
     )
     ep_lens = episode_lengths_from_carla_dataset(base_ds)
     print(f"  Episodes: {len(ep_lens)}, Frames: {sum(ep_lens)}")
