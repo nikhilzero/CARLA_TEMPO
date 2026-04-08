@@ -116,7 +116,7 @@ def load_model(ckpt_path, label):
     sd = ckpt.get("state_dict", ckpt.get("model", ckpt))
     missing, unexpected = model.load_state_dict(sd, strict=False)
     print(f"  Missing={len(missing)}, Unexpected={len(unexpected)}")
-    model.cuda()
+    model.cpu()
     model.eval()
     return model
 
@@ -170,25 +170,25 @@ def run_inference(model, ds, n_samples, label):
     with torch.no_grad():
         for idx in indices:
             frames, _ = ds[idx]
-            # Add batch dimension and move to CUDA
+            # Add batch dimension (CPU inference — runs on login node)
             window = []
             for frame in frames:
                 f = {}
                 for k, v in frame.items():
                     if isinstance(v, torch.Tensor):
-                        f[k] = v.unsqueeze(0).cuda().float()
+                        f[k] = v.unsqueeze(0).float()
                     elif isinstance(v, np.ndarray):
-                        f[k] = torch.from_numpy(v).unsqueeze(0).cuda().float()
+                        f[k] = torch.from_numpy(v).unsqueeze(0).float()
                     else:
                         f[k] = v
                 window.append(f)
 
             traffic, waypoints, is_junction, tl_state, stop_sign, _ = model(window)
 
-            wp_np = waypoints.cpu().numpy()[0]           # (10, 2)
-            junc  = softmax(is_junction).cpu().numpy().reshape(-1)[0]
-            tl    = softmax(tl_state).cpu().numpy().reshape(-1)[0]
-            stop  = softmax(stop_sign).cpu().numpy().reshape(-1)[0]
+            wp_np = waypoints.numpy()[0]                  # (10, 2)
+            junc  = softmax(is_junction).numpy().reshape(-1)[0]
+            tl    = softmax(tl_state).numpy().reshape(-1)[0]
+            stop  = softmax(stop_sign).numpy().reshape(-1)[0]
 
             brake, desired_speed, reason = simulate_controller(wp_np, junc, tl, stop)
 
