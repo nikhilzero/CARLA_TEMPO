@@ -87,6 +87,13 @@ def parse_args():
     # Resume
     p.add_argument("--resume", default=None, help="Path to checkpoint to resume from")
 
+    # Loss weights (default = original values from RES-004)
+    p.add_argument("--w-traffic",   type=float, default=0.50, help="Weight for traffic detection loss")
+    p.add_argument("--w-waypoints", type=float, default=0.20, help="Weight for waypoint L1 loss")
+    p.add_argument("--w-junction",  type=float, default=0.05, help="Weight for junction classification loss")
+    p.add_argument("--w-tl",        type=float, default=0.10, help="Weight for traffic-light state loss")
+    p.add_argument("--w-stop",      type=float, default=0.01, help="Weight for stop-sign classification loss")
+
     return p.parse_args()
 
 
@@ -148,7 +155,7 @@ def move_inputs_to_device(inputs, device):
 
 
 def train_one_epoch(model, loader, optimizer, scheduler, loss_fns, device,
-                    epoch, grad_accum, log_interval, output_dir):
+                    epoch, grad_accum, log_interval, output_dir, loss_weights=None):
     model.train()
     optimizer.zero_grad()
 
@@ -171,12 +178,13 @@ def train_one_epoch(model, loader, optimizer, scheduler, loss_fns, device,
         loss_traffic_light      = loss_fns["cls"](output[3], target[3])
         loss_stop_sign          = loss_fns["stop_cls"](output[4], target[6])
 
+        w = loss_weights or {}
         loss = (
-            loss_traffic       * 0.5
-            + loss_waypoints   * 0.2
-            + loss_junction    * 0.05
-            + loss_traffic_light * 0.1
-            + loss_stop_sign   * 0.01
+            loss_traffic       * w.get("traffic",   0.50)
+            + loss_waypoints   * w.get("waypoints", 0.20)
+            + loss_junction    * w.get("junction",  0.05)
+            + loss_traffic_light * w.get("tl",      0.10)
+            + loss_stop_sign   * w.get("stop",      0.01)
         )
 
         (loss / grad_accum).backward()
@@ -206,7 +214,7 @@ def train_one_epoch(model, loader, optimizer, scheduler, loss_fns, device,
 
 
 @torch.no_grad()
-def validate(model, loader, loss_fns, device):
+def validate(model, loader, loss_fns, device, loss_weights=None):
     model.eval()
     total_loss = 0.0
     steps = 0
@@ -223,12 +231,13 @@ def validate(model, loader, loss_fns, device):
         loss_tl         = loss_fns["cls"](output[3], target[3])
         loss_stop       = loss_fns["stop_cls"](output[4], target[6])
 
+        w = loss_weights or {}
         loss = (
-            loss_traffic   * 0.5
-            + loss_waypoints * 0.2
-            + loss_junction  * 0.05
-            + loss_tl        * 0.1
-            + loss_stop      * 0.01
+            loss_traffic   * w.get("traffic",   0.50)
+            + loss_waypoints * w.get("waypoints", 0.20)
+            + loss_junction  * w.get("junction",  0.05)
+            + loss_tl        * w.get("tl",        0.10)
+            + loss_stop      * w.get("stop",       0.01)
         )
         total_loss += loss.item()
         steps += 1
@@ -378,6 +387,16 @@ def main():
         writer = csv.writer(f)
         writer.writerow(["epoch", "train_loss", "eval_loss"])
 
+    # ---- Loss weights dict (from CLI args) ----
+    loss_weights = {
+        "traffic":   args.w_traffic,
+        "waypoints": args.w_waypoints,
+        "junction":  args.w_junction,
+        "tl":        args.w_tl,
+        "stop":      args.w_stop,
+    }
+    print(f"Loss weights: {loss_weights}")
+
     # ---- Training loop ----
     for epoch in range(start_epoch, args.epochs + 1):
         print(f"\n[Epoch {epoch}/{args.epochs}]")
@@ -385,8 +404,9 @@ def main():
         train_loss = train_one_epoch(
             model, train_loader, optimizer, scheduler, loss_fns, device,
             epoch, args.grad_accum, args.log_interval, output_dir,
+            loss_weights=loss_weights,
         )
-        val_loss = validate(model, val_loader, loss_fns, device)
+        val_loss = validate(model, val_loader, loss_fns, device, loss_weights=loss_weights)
 
         print(f"  => train_loss={train_loss:.4f}  val_loss={val_loss:.4f}")
 
