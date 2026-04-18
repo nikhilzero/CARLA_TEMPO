@@ -1,9 +1,9 @@
 """
 temporal/utils/losses.py — Loss functions for temporal InterFuser training.
 
-WaypointL1Loss and MVTL1Loss are copied verbatim from the baseline
-InterFuser/interfuser/train.py so that temporal training uses the exact
-same loss functions as the baseline (fair comparison).
+WaypointL1Loss and MVTL1Loss are reproduced from the InterFuser baseline
+(InterFuser/interfuser/train.py) to ensure identical loss functions for
+fair comparison between baseline and temporal models.
 """
 
 import torch

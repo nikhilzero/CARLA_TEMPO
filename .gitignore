@@ -46,3 +46,30 @@ logs/
 
 # TensorBoard
 events.out.tfevents.*
+
+# Claude Code private context
+.claude/
+CLAUDE.md
+
+# Thesis draft documents (local only)
+*.pdf
+THESIS_*.md
+FULL_THESIS_REPORT.md
+MODEL_LEARNING_REPORT.md
+THESIS_PRESENTATION.md
+THESIS_RESULTS_REPORT.md
+
+# Demo videos and large media
+*.mp4
+*.avi
+demo/
+
+# Archives
+*.tar.gz
+*.tar
+*.zip
+
+# Results / eval outputs (Amarel-only)
+results/
+results_pack/
+eval/

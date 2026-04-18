@@ -57,7 +57,7 @@ from temporal.data.temporal_dataset import (
 )
 
 
-# ── Controller helpers (copied from interfuser_controller.py) ──────────────────
+# ── Controller helpers (reproduced from interfuser_controller.py for standalone diagnosis) ──
 
 def downsample_waypoints(waypoints, precision=0.2):
     out = [np.array([0.0, 0.0])]

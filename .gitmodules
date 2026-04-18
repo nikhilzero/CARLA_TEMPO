@@ -1,0 +1,3 @@
+[submodule "InterFuser"]
+	path = InterFuser
+	url = https://github.com/opendilab/InterFuser
