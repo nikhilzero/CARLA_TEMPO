@@ -46,3 +46,22 @@ logs/
 
 # TensorBoard
 events.out.tfevents.*
+
+# Claude Code private context
+.claude/
+CLAUDE.md
+
+# Demo videos and large media
+*.mp4
+*.avi
+demo/
+
+# Archives
+*.tar.gz
+*.tar
+*.zip
+
+# Results / eval outputs (Amarel-only)
+results/
+results_pack/
+eval/

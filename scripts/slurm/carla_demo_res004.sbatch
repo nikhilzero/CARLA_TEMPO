@@ -21,7 +21,7 @@
 #SBATCH --error=/scratch/nd967/CARLA_TEMPO/logs/carla_demo_res004_%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=nd967@rutgers.edu
-#SBATCH --exclude=gpu005,gpu006,gpu018,gpu029,gpu030
+#SBATCH --exclude=gpu005,gpu006,gpu017,gpu018,gpu029,gpu030
 
 set -e
 
@@ -158,15 +158,37 @@ FRAME_COUNT=$(ls "${DEMO_FRAMES_DIR}"/frame_*.png 2>/dev/null | wc -l)
 echo "Frames saved: ${FRAME_COUNT}"
 
 if [ "${FRAME_COUNT}" -gt 0 ]; then
-    echo "Stitching frames into ${OUTPUT_VIDEO} at 20 fps..."
-    ffmpeg -y \
-        -framerate 20 \
-        -i "${DEMO_FRAMES_DIR}/frame_%06d.png" \
-        -c:v libx264 \
-        -preset slow \
-        -crf 18 \
-        -pix_fmt yuv420p \
-        "${OUTPUT_VIDEO}"
+    if ffmpeg -version &>/dev/null 2>&1; then
+        echo "Stitching with ffmpeg at 20 fps..."
+        ffmpeg -y \
+            -framerate 20 \
+            -i "${DEMO_FRAMES_DIR}/frame_%06d.png" \
+            -c:v libx264 \
+            -preset slow \
+            -crf 18 \
+            -pix_fmt yuv420p \
+            "${OUTPUT_VIDEO}"
+    else
+        echo "ffmpeg not found — stitching with Python (cv2)..."
+        python - <<PYEOF
+import cv2, glob, os
+frames = sorted(glob.glob("${DEMO_FRAMES_DIR}/frame_*.png"))
+if not frames:
+    print("No frames found")
+    exit(1)
+sample = cv2.imread(frames[0])
+h, w = sample.shape[:2]
+out = cv2.VideoWriter("${OUTPUT_VIDEO}",
+                      cv2.VideoWriter_fourcc(*"mp4v"),
+                      20, (w, h))
+for i, f in enumerate(frames):
+    out.write(cv2.imread(f))
+    if i % 100 == 0:
+        print(f"  {i}/{len(frames)}")
+out.release()
+print(f"Done: ${OUTPUT_VIDEO}")
+PYEOF
+    fi
     echo "Video ready: ${OUTPUT_VIDEO}"
     ls -lh "${OUTPUT_VIDEO}"
 else
