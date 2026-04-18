@@ -176,4 +176,4 @@ This work builds on **InterFuser** (Shao et al., CoRL 2022):
 
 Dataset: **LMDrive** (Jia et al., NeurIPS 2023) — [HuggingFace](https://huggingface.co/datasets/opendilab/LMDrive).
 
-**Thesis advisor**: Prof. Lun Li, Rutgers University–Camden.
+**Thesis advisor**: Prof. Desmond Lun, Rutgers University–Camden.
